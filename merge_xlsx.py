@@ -3,6 +3,9 @@
 # @Author : water
 # @Version  : v1.0
 # @Desc  : 合并excel表
+#          1.修改日期显示为浮点问题，在xlwt写入表格的时候增加格式；
+#          2.修改读取空sheet时的错误提示；
+#          3.增加内容列比标题列多的情况
 
 import xlrd,xlwt
 import time,os
@@ -91,12 +94,17 @@ def main():
         for r in range(len(datas[data])):
             for c in range(len(datas[data][r])):
                 # 根据标题的"日期"、"时间"来格式化写入该列的数据
-                if "日期" in datas[data][0][c]:
-                    sheet.write(r, c, datas[data][r][c], style_date)
-                elif "时间" in datas[data][0][c]:
-                    sheet.write(r, c, datas[data][r][c], style_time)
+                try:
+                    title = datas[data][0][c] #标题列数可能会小于数据实际列
+                except:
+                    sheet.write(r, c, datas[data][r][c])
                 else:
-                    sheet.write(r,c,datas[data][r][c])
+                    if "日期" in title:
+                        sheet.write(r, c, datas[data][r][c], style_date)
+                    elif "时间" in datas[data][0][c]:
+                        sheet.write(r, c, datas[data][r][c], style_time)
+                    else:
+                        sheet.write(r,c,datas[data][r][c])
                 # 单独写入序号
                 if datas[data][0][0] == "序号" and r > 0:
                     sheet.write(r, 0, r)
