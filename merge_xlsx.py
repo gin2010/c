@@ -6,6 +6,7 @@
 #          1.修改日期显示为浮点问题，在xlwt写入表格的时候增加格式；
 #          2.修改读取空sheet时的错误提示；
 #          3.增加内容列比标题列多的情况
+#          4.增加异常表的错误输出、增加"sheet1"（第一位未大写）的处理-202000316
 
 import xlrd,xlwt
 import time,os
@@ -14,12 +15,13 @@ import time,os
 
 TIME_STR = time.strftime("%Y%m%d")
 PATH = os.path.dirname(os.path.abspath(__file__))
+error_excels = list()
 
 def get_name():
     excel_lists = []
     for root, dirs, files in os.walk(PATH, topdown=False):
         for name in files:
-            each_file =  name
+            each_file = name
             if each_file.split('.')[-1] in ['xlsx','xls']:
                 excel_lists.append(each_file)
     return excel_lists
@@ -29,28 +31,40 @@ def merge_excel(excel_files):
     datas = dict()
     for excel_file in excel_files:
         # 打开每一个excel
-        # print(excel_file)
-        wb = xlrd.open_workbook(os.path.join(PATH,excel_file))
+        print("打开：",excel_file)
+        try:
+            wb = xlrd.open_workbook(os.path.join(PATH,excel_file))
+        except Exception as e:
+            print("**工作表无法正常打开**：{} 原因：{}！！！".format(excel_file,e))
+            error_excels.append("**工作表无法正常打开：{} **".format(excel_file))
+
         name = excel_file.split('_')[0]  # 取名字
+        # 对重名进行单独处理，对"姜宁（男）"只保留名字
+        name = name.replace("(","（").split("（")[0]
+
+        # 对一个表里的每个sheet进行循环
         sheets = wb.sheet_names()
         for sheet in sheets:
             # 打开一个sheet
             ws = wb.sheet_by_name(sheet)
             # 判断一个sheet是否为空
             if ws.nrows <= 1 :
-                print("错误：{}表中 <{}> 内容为空，请确认是否填写正确！！".format(excel_file,sheet))
+                print("**错误：{}表中 <{}> 内容为空，请确认是否填写正确！！".format(excel_file,sheet))
+                error_excels.append('**错误：{}表中 <{}> 内容为空**' .format(excel_file,sheet))
                 continue
-            elif datas.get(sheet) == None:
+            elif datas.get(sheet.capitalize()) == None:
                 # 存放对应sheet的字典key初始化
-                datas[sheet] = list()
+                datas[sheet.capitalize()] = list()
                 title = ws.row_values(0)
                 # 如果sheet的列里没有 姓名，插入姓名列
                 if '姓名' not in title:
                     title.insert(0,"姓名")
-                datas[sheet].append(title)
+                datas[sheet.capitalize()].append(title)
             # 读取每一行数据并添加到datas对应key的列表中
             for r in range(1,ws.nrows):
                 each_data = ws.row_values(r)
+                if "".join([str(x) for x in each_data]) == "":
+                    continue
                 # print(each_data)
                 # 增加对日期类型的判断，由于有些日期(如2020年2月2日)读进来以后ctype是2，所以无法处理
                 # each_data = list()
@@ -64,10 +78,11 @@ def merge_excel(excel_files):
                 #     else:
                 #         each_data.append(ws.cell(r, c).value)
                 # 将名字添加到数据表中
-                if name not in each_data[:2]:
-                    each_data.insert(0,name)
-                datas[sheet].append(each_data)
-                # print(each_data)
+                else:
+                    if name not in each_data[:2]:
+                        each_data.insert(0,name)
+                    datas[sheet.capitalize()].append(each_data)
+        print("处理完成：",excel_file)
     return datas
 
 
@@ -101,7 +116,7 @@ def main():
                 else:
                     if "日期" in title:
                         sheet.write(r, c, datas[data][r][c], style_date)
-                    elif "时间" in datas[data][0][c]:
+                    elif "时间" in datas[data][0][c][:10]:
                         sheet.write(r, c, datas[data][r][c], style_time)
                     else:
                         sheet.write(r,c,datas[data][r][c])
@@ -109,8 +124,17 @@ def main():
                 if datas[data][0][0] == "序号" and r > 0:
                     sheet.write(r, 0, r)
     out_excel.save(os.path.join(PATH,'result' + "_" + wb_name))
-    print("合并表格为：",'result' + "_" + wb_name)
+    print()
+    print('-'*60)
+    print('---------------合并成功---------------------')
+    print("合并后表格为：",'result' + "_" + wb_name)
 
 if __name__ == "__main__":
     main()
-    input("------合并成功-------")
+    if error_excels:
+        print()
+        print('----------------有问题的表格----------------')
+        for error in error_excels:
+            print(error)
+    print()
+    input("按回车退出:")
