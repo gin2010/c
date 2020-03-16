@@ -1,5 +1,8 @@
 # Prerequisites
 *.d
+.idea
+.gitignore
+.DS_Store
 
 # Object files
 *.o
